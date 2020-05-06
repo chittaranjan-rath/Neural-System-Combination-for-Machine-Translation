@@ -1,0 +1,44 @@
+
+~/mosesdecoder/scripts/tokenizer/tokenizer.perl -l en < ~/corpus/training/dataset.en-hi.en > ~/corpus/dataset.en-hi.tok.en
+
+~/mosesdecoder/scripts/tokenizer/tokenizer.perl -l hi < ~/corpus/training/dataset.en-hi.hi > ~/corpus/dataset.en-hi.tok.hi
+
+~/mosesdecoder/scripts/recaser/train-truecaser.perl --model ~/corpus/truecase-model.en --corpus ~/corpus/dataset.en-hi.tok.en
+
+~/mosesdecoder/scripts/recaser/train-truecaser.perl --model ~/corpus/truecase-model.hi --corpus ~/corpus/dataset.en-hi.tok.hi
+
+~/mosesdecoder/scripts/recaser/truecase.perl --model ~/corpus/truecase-model.en < ~/corpus/dataset.en-hi.tok.en > ~/corpus/dataset.en-hi.true.en
+
+~/mosesdecoder/scripts/recaser/truecase.perl --model ~/corpus/truecase-model.hi < ~/corpus/dataset.en-hi.tok.hi > ~/corpus/dataset.en-hi.true.hi
+
+~/mosesdecoder/scripts/training/clean-corpus-n.perl ~/corpus/dataset.en-hi.true hi en ~/corpus/dataset.en-hi.clean 1 80
+
+
+
+cd lm
+~/mosesdecoder/bin/lmplz -o 3 < ~/corpus/dataset.en-hi.true.en > dataset.en-hi.arpa.en
+
+ 
+~/mosesdecoder/bin/build_binary dataset.en-hi.arpa.en dataset.en-hi.blm.en
+
+
+echo "is this an English sentence ?" | ~/mosesdecoder/bin/query dataset.en-hi.blm.en
+
+
+
+
+
+nohup nice ~/mosesdecoder/scripts/training/train-model.perl -root-dir train -corpus ~/corpus/dataset.en-hi.clean \
+-f hi -e en -alignment grow-diag-final-and -reordering msd-bidirectional-fe -lm 0:3:$HOME/lm/dataset.en-hi.blm.en:8 -external-bin-dir ~/mosesdecoder/tools > & training.out &
+
+nohup nice ~/mosesdecoder/scripts/training/mert-moses.pl ~/corpus/dataset.true.hi ~/corpus/dataset.true.en ~/mosesdecoder/bin/moses train/model/moses.ini --mertdir ~/mosesdecoder/bin/ &> mert.out &
+
+~/mosesdecoder/bin/moses -f ~/working/mert-work/moses.ini
+
+~/mosesdecoder/bin/processPhraseTableMin -in train/model/phrase-table.gz -nscores 4 -out binarised-model/phrase-table ~/mosesdecoder/bin/processLexicalTableMin -in train/model/reordering-table.wbe-msd-bidirectional-fe.gz -out binarised-model/reordering-table
+
+
+nohup nice ~/mosesdecoder/bin/moses -f ~/working/filtered-dataset/moses.ini < ~/corpus/dataset.true.hi > ~/working/dataset.translated.en > ~/working/dataset.out ~/mosesdecoder/scripts/generic/multi-bleu.perl -lc ~/corpus/dataset.true.en < ~/working/dataset.translated.en
+
+
+
